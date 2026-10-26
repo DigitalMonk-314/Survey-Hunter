@@ -1,0 +1,8 @@
+telethon
+aiogram>=3.4
+aiosqlite
+pyyaml
+pydantic-settings
+python-dotenv
+pytest
+pytest-asyncio
