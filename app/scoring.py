@@ -42,25 +42,20 @@ def calculate_score(text: str, features: Dict[str, Any], profile_data: Dict[str,
     # Если город не найден (пустой список) - ничего не меняем (неизвестность)
 
     # --- 3. Интересы и Стоп-слова (объединяем оба YAML) ---
-    # Берем интересы из profile.yaml (IT, Финансы)
     profile_interests = profile_data.get("interests", [])
-    # Берем интересы из keywords.yaml (Чипсы, Кошки)
     keyword_interests = KEYWORDS.get("interests", [])
     
-    # Ищем совпадения по всем интересам
     all_interests = profile_interests + keyword_interests
     matched_interests = [word for word in all_interests if word.lower() in lower_text]
     score += 20 * len(matched_interests)  # +20 за каждое совпадение
 
-    # Берем стоп-слова из profile.yaml (Медицина, Дети)
     profile_dislikes = profile_data.get("dislikes", [])
-    # Берем стоп-слова из keywords.yaml (Предприниматели)
     keyword_stops = KEYWORDS.get("stop_topics", [])
     
     all_stops = profile_dislikes + keyword_stops
     matched_stops = []
     for word in all_stops:
-        # Ищем слово как отдельное слово (с границами \b), чтобы не штрафовать за "чипсы" из-за "ип"
+        # Ищем слово как отдельное слово (с границами \b)
         pattern = r'\b' + re.escape(word.lower()) + r'\b'
         if re.search(pattern, lower_text):
             matched_stops.append(word)
@@ -68,13 +63,7 @@ def calculate_score(text: str, features: Dict[str, Any], profile_data: Dict[str,
     if matched_stops:
         score -= 100  # Жесткий штраф за нежелательную тему
     
-
-    
-
     return score
 
 def is_relevant(score: int) -> bool:
     return score >= settings.score_threshold
-
-
-
