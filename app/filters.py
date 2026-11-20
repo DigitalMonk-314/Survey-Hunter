@@ -44,36 +44,57 @@ def extract_links_from_buttons(message) -> List[str]:
 # --- 3. Извлечение признаков (Feature Extraction) ---
 
 def extract_features(text: str) -> Dict[str, Any]:
-    """Пытается вытащить город, возраст, оплату и время из текста."""
+    """Пытается вытащить город, возраст, пол, оплату и время из текста."""
     features = {
         "cities": [],
-        "age": None,
+        "age_min": None,
+        "age_max": None,
+        "gender": None,
         "paid": False,
         "minutes": None,
     }
-    
+
     lower_text = text.lower()
-    
-    # 1. Поиск упоминания оплаты
+
+    # 1. Оплата
     paid_keywords = ["оплата", "вознаграждение", "руб", "перевод на карту", "сертификат", "деньги"]
     if any(word in lower_text for word in paid_keywords):
         features["paid"] = True
-        
-    # 2. Поиск длительности (например, "10 минут", "5 мин")
+
+    # 2. Длительность
     minutes_match = re.search(r'(\d+)\s*(минут|мин)', lower_text)
     if minutes_match:
         features["minutes"] = int(minutes_match.group(1))
-        
-    # 3. Поиск возраста (например, "18-35 лет", "от 25 до 40")
-    age_match = re.search(r'(\d{2})\s*[-–]\s*(\d{2})\s*(лет|года)', lower_text)
-    if age_match:
-        features["age"] = f"{age_match.group(1)}-{age_match.group(2)}"
-    
-    # 4. Поиск городов (список можно расширять)
-    # Пока ищем только "Москва" и "вся Россия" как пример
+
+    # 3. Возраст
+    age_range = re.search(r'(?:от\s*)?(\d{2})\s*[-–—]\s*(\d{2})', lower_text)
+    if age_range:
+        features["age_min"] = int(age_range.group(1))
+        features["age_max"] = int(age_range.group(2))
+    else:
+        age_from_to = re.search(r'от\s*(\d{2})\s*до\s*(\d{2})', lower_text)
+        if age_from_to:
+            features["age_min"] = int(age_from_to.group(1))
+            features["age_max"] = int(age_from_to.group(2))
+        else:
+            age_plus = re.search(r'(?:от\s*)?(\d{2})\s*\+', lower_text)
+            if age_plus:
+                features["age_min"] = int(age_plus.group(1))
+            else:
+                age_to = re.search(r'до\s*(\d{2})', lower_text)
+                if age_to:
+                    features["age_max"] = int(age_to.group(1))
+
+    # 4. Пол
+    if re.search(r'\bмужчин|только\s+мужчин', lower_text):
+        features["gender"] = "male"
+    if re.search(r'\bженщин|только\s+женщин', lower_text):
+        features["gender"] = "female"
+
+    # 5. Города
     known_cities = ["москва", "санкт-петербург", "вся россия", "онлайн"]
     for city in known_cities:
         if city in lower_text:
             features["cities"].append(city)
-            
+
     return features
