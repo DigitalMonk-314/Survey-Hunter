@@ -1,4 +1,5 @@
-telethon
+httpx
+beautifulsoup4
 aiogram>=3.4
 aiosqlite
 pyyaml

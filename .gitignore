@@ -27,8 +27,6 @@ venv/
 
 # Secrets & Data
 .env
-*.session
-*.session-journal
 data/*.db
 
 # OS / IDE
