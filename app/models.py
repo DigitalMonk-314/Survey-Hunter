@@ -11,14 +11,14 @@ class MessageStatus:
 
 @dataclass
 class Source:
-    tg_id: int
+    tg_id: str  # <-- ИЗМЕНЕНО: было int, теперь str (username канала)
     username: Optional[str] = None
     title: Optional[str] = None
     paused: bool = False
 
 @dataclass
 class Message:
-    source_tg_id: int
+    source_tg_id: str  # <-- ИЗМЕНЕНО: было int, теперь str
     tg_message_id: int
     text: str
     links: str
@@ -35,3 +35,4 @@ class Feedback:
     action: str
     id: Optional[int] = None
     created_at: Optional[datetime] = None
+

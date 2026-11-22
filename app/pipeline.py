@@ -1,16 +1,13 @@
-import asyncio
 import json
 import logging
-from typing import Optional
-
-from telethon.tl.custom.message import Message as TgMessage
+import asyncio
+from typing import Optional, Dict, Any
 
 from app.db import is_duplicate, save_message
 from app.filters import (
     normalize_text,
     make_hash,
     extract_links_from_text,
-    extract_links_from_buttons,
     extract_features,
 )
 from app.models import Message, MessageStatus
@@ -23,16 +20,23 @@ logger = logging.getLogger(__name__)
 notification_queue: asyncio.Queue = asyncio.Queue()
 
 
-async def process_message(message: TgMessage, chat_title: str) -> Optional[int]:
+async def process_message(msg_data: Dict[str, Any]) -> Optional[int]:
     """
-    Обрабатывает одно сообщение из Telegram-канала.
+    Обрабатывает одно сообщение, полученное от HTTP-парсера.
+    Принимает словарь с ключами: id, text, links, channel_username.
     Возвращает ID сохранённого сообщения или None, если сообщение пропущено.
     """
     try:
-        # 1. Нормализация
-        normalized = normalize_text(message.message or "")
+        # 1. Извлекаем данные из словаря
+        raw_text = msg_data.get("text", "")
+        channel_username = msg_data.get("channel_username", "unknown")
+        msg_id = msg_data.get("id", 0)
+        raw_links = msg_data.get("links", [])
+
+        # 2. Нормализация текста
+        normalized = normalize_text(raw_text)
         if not normalized:
-            logger.debug("Пустое сообщение, пропуск.")
+            logger.debug(f"Пустое сообщение из {channel_username}, пропуск.")
             return None
 
         # 3. Хэш и дедупликация
@@ -42,41 +46,40 @@ async def process_message(message: TgMessage, chat_title: str) -> Optional[int]:
             return None
 
         # 4. Извлечение ссылок и признаков
-        links = extract_links_from_text(normalized)
-        links.extend(extract_links_from_buttons(message))
-        # Убираем дубли ссылок, сохраняя порядок
-        links = list(dict.fromkeys(links))
+        # Берем ссылки из текста через regex
+        text_links = extract_links_from_text(normalized)
+        # Ссылки из парсера (теги <a>) добавляем к найденным
+        all_links = list(dict.fromkeys(text_links + raw_links))
 
         features = extract_features(normalized)
 
-        # 4. Скоринг
+        # 5. Скоринг
         score = calculate_score(normalized, features, profile.data)
 
-        # 5. Сохраняем в БД (все сообщения, не только релевантные)
+        # 6. Сохраняем в БД (все сообщения, не только релевантные)
         msg = Message(
-            source_tg_id=message.chat_id,
-            tg_message_id=message.id,
+            source_tg_id=channel_username,  # Теперь тут строка (username)
+            tg_message_id=msg_id,           # ID поста из веб-версии
             text=normalized,
-            links=json.dumps(links, ensure_ascii=False),
+            links=json.dumps(all_links, ensure_ascii=False),
             features=json.dumps(features, ensure_ascii=False),
             score=score,
             hash=msg_hash,
             status=MessageStatus.NEW,
         )
-        msg_id = await save_message(msg)
+        saved_id = await save_message(msg)
 
-        # 6. Если релевантно — ставим в очередь на уведомление
+        # 7. Если релевантно — ставим в очередь на уведомление
         if is_relevant(score):
             logger.info(
-                f"🔥 Релевантное сообщение (score={score}) из «{chat_title}», id={msg_id}"
+                f"🔥 Релевантное сообщение (score={score}) из «{channel_username}», id={saved_id}"
             )
-            await notification_queue.put(msg_id)
+            await notification_queue.put(saved_id)
         else:
-            logger.debug(f"Сообщение отклонено (score={score}), id={msg_id}")
+            logger.debug(f"Сообщение отклонено (score={score}), id={saved_id}")
 
-        return msg_id
+        return saved_id
 
     except Exception as e:
         logger.exception(f"Ошибка в pipeline.process_message: {e}")
         return None
-

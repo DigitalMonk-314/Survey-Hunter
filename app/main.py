@@ -3,9 +3,8 @@ import logging
 import signal
 import sys
 
-from app.config import settings
 from app.db import init_db
-from app.parser import client, run_parser
+from app.parser import run_parser
 from app.notifier import dp, bot, notification_worker
 
 # Настраиваем логирование в файл и консоль
@@ -41,8 +40,8 @@ async def main():
     logger.info("Запуск воркера уведомлений...")
     worker_task = asyncio.create_task(notification_worker())
 
-    # 4. Запускаем парсер (Telethon) как фоновую задачу
-    logger.info("Запуск парсера (Telethon)...")
+    # 4. Запускаем парсер (httpx) как фоновую задачу
+    logger.info("Запуск HTTP-парсера...")
     parser_task = asyncio.create_task(run_parser())
 
     # 5. Ждем сигнала завершения
@@ -56,10 +55,11 @@ async def main():
     worker_task.cancel()
     parser_task.cancel()
 
-    # Закрываем клиенты
+    # Ждем, чтобы задачи успели корректно завершиться
+    await asyncio.gather(bot_task, worker_task, parser_task, return_exceptions=True)
+
+    # Закрываем сессию бота
     await bot.session.close()
-    if client.is_connected():
-        await client.disconnect()
 
     logger.info("Survey Hunter остановлен.")
     sys.exit(0)

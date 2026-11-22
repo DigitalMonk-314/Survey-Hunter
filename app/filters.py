@@ -25,21 +25,8 @@ def make_hash(text: str) -> str:
 
 def extract_links_from_text(text: str) -> List[str]:
     """Ищет URL в тексте сообщения."""
-    # Простой regex для поиска http/https ссылок
     url_pattern = r'https?://[^\s]+'
     return re.findall(url_pattern, text)
-
-def extract_links_from_buttons(message) -> List[str]:
-    """Достает URL из inline-кнопок (reply_markup) сообщения Telethon."""
-    links = []
-    rm = getattr(message, "reply_markup", None)
-    if rm and hasattr(rm, "rows"):
-        for row in rm.rows:
-            for btn in row.buttons:
-                url = getattr(btn, "url", None)
-                if url:
-                    links.append(url)
-    return links
 
 # --- 3. Извлечение признаков (Feature Extraction) ---
 
